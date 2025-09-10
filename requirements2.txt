@@ -1,6 +1,6 @@
 python-telegram-bot==20.7
 yt-dlp==2023.11.16
 requests==2.31.0
-urllib3==1.26.16
+urllib3>=1.26.17,<3
 certifi==2023.7.22
 aiohttp==3.8.5
