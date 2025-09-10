@@ -3,7 +3,8 @@ services:
     name: my-bot
     env: python
     plan: free
-    buildCommand: |
-      apt-get update && apt-get install -y python3 python3-venv python3-pip
-      pip install -r requirements.txt
-    startCommand: python bott.py
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    envVars:
+      - key: PYTHON_IMAGE
+        value: python:3.11
