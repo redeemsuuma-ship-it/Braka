@@ -6,7 +6,16 @@ import asyncio
 import subprocess
 import time
 from urllib.parse import urlparse
+# Set SSL environment variables
+os.environ['SSL_CERT_FILE'] = '/etc/ssl/certs/ca-certificates.crt'
+os.environ['REQUESTS_CA_BUNDLE'] = '/etc/ssl/certs/ca-certificates.crt'
 
+# Try to use system certificates
+try:
+    import ssl
+    ssl._create_default_https_context = ssl._create_unverified_context
+except:
+    pass
 # Bot configuration
 BOT_TOKEN = os.environ.get('BOT_TOKEN', "BOT_TOKEN")
 PORT = int(os.environ.get("PORT", 8080))
@@ -60,67 +69,85 @@ class TikTokDownloader:
             return False
     
     async def download_tiktok(self, url):
-        """Download TikTok video using yt-dlp"""
-        try:
-            timestamp = int(time.time())
-            output_template = os.path.join(self.temp_dir, f"tiktok_{timestamp}.%(ext)s")
-            
-            cmd = [
-                'yt-dlp',
-                '--format', 'best[filesize<50M]/worst',
-                '--output', output_template,
-                '--no-playlist',
-                '--no-warnings',
-                '--no-check-certificates',  # Disable SSL verification
-                '--force-ipv4',  # Force IPv4
-                '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',  # Add user agent
-                url
-            ]
-            
-            logger.info(f"Downloading: {url}")
-            
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            
-            try:
-                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=120)
-            except asyncio.TimeoutError:
-                process.kill()
-                return None, "Download timeout", 0
-            
-            if process.returncode == 0:
-                # Find the downloaded file
-                files = [f for f in os.listdir(self.temp_dir) 
-                        if f.startswith(f"tiktok_{timestamp}")]
-                
-                if files:
-                    file_path = os.path.join(self.temp_dir, files[0])
-                    if os.path.exists(file_path):
-                        file_size = os.path.getsize(file_path) / (1024 * 1024)  # MB
-                        if file_size > 0.1:  # At least 100KB
-                            logger.info(f"Downloaded: {file_size:.1f}MB")
-                            return file_path, "TikTok Video", file_size
-                
-                return None, "No file generated", 0
-            else:
-                error = stderr.decode() if stderr else "Unknown error"
-                logger.error(f"Download failed: {error}")
-                
-                if "unavailable" in error.lower():
-                    return None, "Video unavailable", 0
-                elif "private" in error.lower():
-                    return None, "Private video", 0
-                elif "not found" in error.lower() or "404" in error:
-                    return None, "Video not found", 0
-                else:
-                    return None, "Download failed", 0
+    """Download TikTok video using yt-dlp"""
+    try:
+        timestamp = int(time.time())
+        output_template = os.path.join(self.temp_dir, f"tiktok_{timestamp}.%(ext)s")
         
-        except Exception as e:
-            logger.error(f"Download error: {e}")
-            return None, f"Error: {str(e)[:50]}", 0
+        # Set SSL certificate path
+        cert_path = "/etc/ssl/certs/ca-certificates.crt"
+        if not os.path.exists(cert_path):
+            cert_path = "/etc/ssl/certs/ca-bundle.crt"
+        
+        cmd = [
+            'yt-dlp',
+            '--format', 'best[filesize<50M]/worst',
+            '--output', output_template,
+            '--no-playlist',
+            '--no-warnings',
+            '--force-ipv4',
+            '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            '--compat-options', 'no-certifi',  # Disable certifi usage
+            url
+        ]
+        
+        # Add certificate path if available
+        if os.path.exists(cert_path):
+            cmd.extend(['--client-certificate', cert_path])
+        else:
+            # Fallback to no certificate check
+            cmd.append('--no-check-certificates')
+        
+        logger.info(f"Downloading: {url}")
+        
+        # Set environment to use system certificates
+        env = os.environ.copy()
+        env['SSL_CERT_FILE'] = cert_path if os.path.exists(cert_path) else ''
+        env['REQUESTS_CA_BUNDLE'] = cert_path if os.path.exists(cert_path) else ''
+        
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env
+        )
+        
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=120)
+        except asyncio.TimeoutError:
+            process.kill()
+            return None, "Download timeout", 0
+        
+        if process.returncode == 0:
+            # Find the downloaded file
+            files = [f for f in os.listdir(self.temp_dir) 
+                    if f.startswith(f"tiktok_{timestamp}")]
+            
+            if files:
+                file_path = os.path.join(self.temp_dir, files[0])
+                if os.path.exists(file_path):
+                    file_size = os.path.getsize(file_path) / (1024 * 1024)  # MB
+                    if file_size > 0.1:  # At least 100KB
+                        logger.info(f"Downloaded: {file_size:.1f}MB")
+                        return file_path, "TikTok Video", file_size
+            
+            return None, "No file generated", 0
+        else:
+            error = stderr.decode() if stderr else "Unknown error"
+            logger.error(f"Download failed: {error}")
+            
+            if "unavailable" in error.lower():
+                return None, "Video unavailable", 0
+            elif "private" in error.lower():
+                return None, "Private video", 0
+            elif "not found" in error.lower() or "404" in error:
+                return None, "Video not found", 0
+            else:
+                return None, "Download failed", 0
+    
+    except Exception as e:
+        logger.error(f"Download error: {e}")
+        return None, f"Error: {str(e)[:50]}", 0
     
     def cleanup_old_files(self):
         """Remove files older than 30 minutes"""
