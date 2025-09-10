@@ -9,6 +9,7 @@ import json
 import time
 from telegram import Update, InputFile
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import Updater
 from urllib.parse import urlparse
 
 # Bot configuration
@@ -322,30 +323,34 @@ def main():
         else:
             logger.warning("yt-dlp not available!")
         
-        # Create application
-        app = Application.builder().token(BOT_TOKEN).build()
+        # Create application using the older API
+        from telegram.ext import Updater, CommandHandler as OldCommandHandler, MessageHandler as OldMessageHandler, Filters
+        
+        updater = Updater(token=BOT_TOKEN, use_context=True)
+        dispatcher = updater.dispatcher
         
         # Add handlers
-        app.add_handler(CommandHandler("start", start_command))
-        app.add_handler(CommandHandler("help", help_command))
-        app.add_handler(CommandHandler("status", status_command))
-        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_url))
-        app.add_error_handler(error_handler)
+        dispatcher.add_handler(OldCommandHandler("start", start_command))
+        dispatcher.add_handler(OldCommandHandler("help", help_command))
+        dispatcher.add_handler(OldCommandHandler("status", status_command))
+        dispatcher.add_handler(OldMessageHandler(Filters.text & ~Filters.command, handle_url))
         
         logger.info("Bot ready!")
         
-        # Start bot - handle Render deployment
+        # Start bot
         if RENDER and WEBHOOK_URL:
             logger.info(f"Starting webhook mode on port {PORT}")
-            app.run_webhook(
+            updater.start_webhook(
                 listen="0.0.0.0",
                 port=PORT,
-                webhook_url=WEBHOOK_URL,
-                url_path=BOT_TOKEN  # Use bot token as webhook path
+                url_path=BOT_TOKEN,
+                webhook_url=WEBHOOK_URL
             )
         else:
             logger.info("Starting polling mode")
-            app.run_polling()
+            updater.start_polling()
+        
+        updater.idle()
     
     except Exception as e:
         logger.error(f"Startup error: {e}")
