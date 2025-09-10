@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import ssl
 import logging
 import asyncio
 import subprocess
@@ -11,6 +12,9 @@ BOT_TOKEN = os.environ.get('BOT_TOKEN', "BOT_TOKEN")
 PORT = int(os.environ.get("PORT", 8080))
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")
 RENDER = os.environ.get("RENDER", "").lower() == "true"
+
+# Disable SSL verification for yt-dlp
+os.environ['YTDLP_NO_SSL_VERIFY'] = '1'
 
 # Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -67,7 +71,9 @@ class TikTokDownloader:
                 '--output', output_template,
                 '--no-playlist',
                 '--no-warnings',
-                '--no-check-certificates',
+                '--no-check-certificates',  # Disable SSL verification
+                '--force-ipv4',  # Force IPv4
+                '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',  # Add user agent
                 url
             ]
             
@@ -353,21 +359,25 @@ def main():
         app.add_handler(CommandHandler("help", help_command))
         app.add_handler(CommandHandler("status", status_command))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_url))
+        app.add_error_handler(error_handler)
         
         logger.info("Bot ready!")
         
-        # Start bot
-        if RENDER and WEBHOOK_URL:
+        # Start bot - FIXED: Only use webhook on Render, not both
+        if RENDER:
             logger.info(f"Starting webhook mode on port {PORT}")
+            # Set webhook URL properly
+            webhook_url = f"{WEBHOOK_URL}/{BOT_TOKEN}" if WEBHOOK_URL else f"https://your-app-name.onrender.com/{BOT_TOKEN}"
             app.run_webhook(
                 listen="0.0.0.0",
                 port=PORT,
-                webhook_url=WEBHOOK_URL,
-                url_path=BOT_TOKEN
+                webhook_url=webhook_url,
+                url_path=BOT_TOKEN,
+                drop_pending_updates=True
             )
         else:
             logger.info("Starting polling mode")
-            app.run_polling()
+            app.run_polling(drop_pending_updates=True)
     
     except Exception as e:
         logger.error(f"Startup error: {e}")
