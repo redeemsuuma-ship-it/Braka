@@ -11,11 +11,15 @@ from urllib.parse import urlparse
 os.environ['SSL_CERT_FILE'] = '/etc/ssl/certs/ca-certificates.crt'
 os.environ['REQUESTS_CA_BUNDLE'] = '/etc/ssl/certs/ca-certificates.crt'
 
-# Try to use system certificates
+# Try to use system certificates and disable SSL verification
 try:
     import ssl
     ssl._create_default_https_context = ssl._create_unverified_context
-except:
+    # Create a context that doesn't verify certificates
+    ssl.create_default_context().check_hostname = False
+    ssl.create_default_context().verify_mode = ssl.CERT_NONE
+except Exception as e:
+    print(f"SSL setup warning: {e}")
     pass
 
 # Bot configuration
@@ -26,6 +30,9 @@ RENDER = os.environ.get("RENDER", "").lower() == "true"
 
 # Disable SSL verification for yt-dlp
 os.environ['YTDLP_NO_SSL_VERIFY'] = '1'
+os.environ['PYTHONHTTPSVERIFY'] = '0'
+os.environ['CURL_CA_BUNDLE'] = ""
+os.environ['REQUESTS_CA_BUNDLE'] = ""
 
 # Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
