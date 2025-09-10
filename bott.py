@@ -33,6 +33,8 @@ os.environ['YTDLP_NO_SSL_VERIFY'] = '1'
 os.environ['PYTHONHTTPSVERIFY'] = '0'
 os.environ['CURL_CA_BUNDLE'] = ""
 os.environ['REQUESTS_CA_BUNDLE'] = ""
+os.environ['SSL_VERIFY'] = 'false'
+os.environ['PYTHONDONTWRITEBYTECODE'] = '1'
 
 # Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
