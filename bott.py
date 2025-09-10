@@ -2,10 +2,7 @@
 import os
 import logging
 import asyncio
-import signal
-import sys
 import subprocess
-import json
 import time
 from urllib.parse import urlparse
 
@@ -140,9 +137,6 @@ downloader = TikTokDownloader()
 
 async def start_command(update, context):
     """Start command handler"""
-    from telegram import Update
-    update = Update.de_json(update, context.bot)
-    
     has_ytdlp, version = downloader.check_ytdlp()
     
     if has_ytdlp:
@@ -178,9 +172,6 @@ Bot is currently unavailable."""
 
 async def help_command(update, context):
     """Help command handler"""
-    from telegram import Update
-    update = Update.de_json(update, context.bot)
-    
     help_text = """🤖 **TikTok Downloader Help**
 
 **Usage:**
@@ -208,9 +199,6 @@ async def help_command(update, context):
 
 async def status_command(update, context):
     """Status command handler"""
-    from telegram import Update
-    update = Update.de_json(update, context.bot)
-    
     has_ytdlp, version = downloader.check_ytdlp()
     
     # Count temp files
@@ -240,9 +228,6 @@ Ready for TikTok downloads!"""
 
 async def handle_url(update, context):
     """Handle TikTok URL messages"""
-    from telegram import Update
-    update = Update.de_json(update, context.bot)
-    
     url = update.message.text.strip()
     
     # Check if it's a TikTok URL
@@ -358,7 +343,7 @@ def main():
         else:
             logger.warning("yt-dlp not available!")
         
-        # Create application using the v20.9 API
+        # Create application
         from telegram.ext import Application, CommandHandler, MessageHandler, filters
         
         app = Application.builder().token(BOT_TOKEN).build()
