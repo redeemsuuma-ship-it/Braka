@@ -363,21 +363,22 @@ def main():
         
         logger.info("Bot ready!")
         
-        # Start bot - FIXED: Only use webhook on Render, not both
-        if RENDER:
+        # Start bot - FIXED: Only use webhook on Render
+        if RENDER and WEBHOOK_URL:
             logger.info(f"Starting webhook mode on port {PORT}")
-            # Set webhook URL properly
-            webhook_url = f"{WEBHOOK_URL}/{BOT_TOKEN}" if WEBHOOK_URL else f"https://your-app-name.onrender.com/{BOT_TOKEN}"
             app.run_webhook(
                 listen="0.0.0.0",
                 port=PORT,
-                webhook_url=webhook_url,
+                webhook_url=WEBHOOK_URL,
                 url_path=BOT_TOKEN,
                 drop_pending_updates=True
             )
         else:
             logger.info("Starting polling mode")
-            app.run_polling(drop_pending_updates=True)
+            app.run_polling(
+                drop_pending_updates=True,
+                allowed_updates=['message', 'callback_query']
+            )
     
     except Exception as e:
         logger.error(f"Startup error: {e}")
