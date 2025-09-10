@@ -4,6 +4,7 @@ import logging
 import asyncio
 import subprocess
 import time
+import imghdr
 from urllib.parse import urlparse
 
 # Bot configuration
@@ -11,7 +12,7 @@ BOT_TOKEN = os.environ.get('BOT_TOKEN', "BOT_TOKEN")
 PORT = int(os.environ.get("PORT", 8080))
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")
 RENDER = os.environ.get("RENDER", "").lower() == "true"
-
+print("imghdr is available")
 # Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMP_DIR = os.path.join(BASE_DIR, 'downloads')
