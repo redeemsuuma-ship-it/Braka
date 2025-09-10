@@ -7,9 +7,6 @@ import sys
 import subprocess
 import json
 import time
-from telegram import Update, InputFile
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from telegram.ext import Updater
 from urllib.parse import urlparse
 
 # Bot configuration
@@ -141,8 +138,11 @@ class TikTokDownloader:
 # Global instance
 downloader = TikTokDownloader()
 
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start_command(update, context):
     """Start command handler"""
+    from telegram import Update
+    update = Update.de_json(update, context.bot)
+    
     has_ytdlp, version = downloader.check_ytdlp()
     
     if has_ytdlp:
@@ -174,10 +174,13 @@ Send me a TikTok link to get started! 🚀"""
 ❌ yt-dlp not available
 Bot is currently unavailable."""
     
-    await update.message.reply_text(message)
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=message)
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def help_command(update, context):
     """Help command handler"""
+    from telegram import Update
+    update = Update.de_json(update, context.bot)
+    
     help_text = """🤖 **TikTok Downloader Help**
 
 **Usage:**
@@ -201,10 +204,13 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /help - This help
 /status - Bot status"""
     
-    await update.message.reply_text(help_text)
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=help_text)
 
-async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def status_command(update, context):
     """Status command handler"""
+    from telegram import Update
+    update = Update.de_json(update, context.bot)
+    
     has_ytdlp, version = downloader.check_ytdlp()
     
     # Count temp files
@@ -230,33 +236,34 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 Ready for TikTok downloads!"""
     
-    await update.message.reply_text(status)
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=status)
 
-async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_url(update, context):
     """Handle TikTok URL messages"""
+    from telegram import Update
+    update = Update.de_json(update, context.bot)
+    
     url = update.message.text.strip()
     
     # Check if it's a TikTok URL
     if not downloader.is_tiktok_url(url):
-        await update.message.reply_text(
-            "❌ **Not a TikTok URL**\n\n"
-            "Please send a valid TikTok link like:\n"
-            "• tiktok.com/@user/video/...\n"
-            "• vm.tiktok.com/..."
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ **Not a TikTok URL**\n\nPlease send a valid TikTok link like:\n• tiktok.com/@user/video/...\n• vm.tiktok.com/..."
         )
         return
     
     # Check if yt-dlp is available
     has_ytdlp, _ = downloader.check_ytdlp()
     if not has_ytdlp:
-        await update.message.reply_text("❌ Service temporarily unavailable")
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ Service temporarily unavailable")
         return
     
     # Clean old files
     downloader.cleanup_old_files()
     
     # Show progress
-    status_msg = await update.message.reply_text("⏳ **Downloading TikTok...**")
+    status_msg = await context.bot.send_message(chat_id=update.effective_chat.id, text="⏳ **Downloading TikTok...**")
     
     try:
         # Download the video
@@ -264,33 +271,61 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if file_path and os.path.exists(file_path):
             if 0.1 <= file_size <= 50:
-                await status_msg.edit_text("📤 **Sending video...**")
+                await context.bot.edit_message_text(
+                    chat_id=update.effective_chat.id,
+                    message_id=status_msg.message_id,
+                    text="📤 **Sending video...**"
+                )
                 
                 try:
                     with open(file_path, 'rb') as video_file:
-                        await update.message.reply_video(
-                            video=InputFile(video_file),
+                        await context.bot.send_video(
+                            chat_id=update.effective_chat.id,
+                            video=video_file,
                             caption=f"🎵 **{title}**\n💾 {file_size:.1f}MB",
                             supports_streaming=True
                         )
                     
-                    await status_msg.delete()
+                    await context.bot.delete_message(
+                        chat_id=update.effective_chat.id,
+                        message_id=status_msg.message_id
+                    )
                     logger.info(f"Video sent successfully: {file_size:.1f}MB")
                     
                 except Exception as e:
                     logger.error(f"Send error: {e}")
-                    await status_msg.edit_text("❌ **Failed to send video**")
+                    await context.bot.edit_message_text(
+                        chat_id=update.effective_chat.id,
+                        message_id=status_msg.message_id,
+                        text="❌ **Failed to send video**"
+                    )
                 
             elif file_size > 50:
-                await status_msg.edit_text(f"❌ **File too large: {file_size:.1f}MB**\nTelegram limit: 50MB")
+                await context.bot.edit_message_text(
+                    chat_id=update.effective_chat.id,
+                    message_id=status_msg.message_id,
+                    text=f"❌ **File too large: {file_size:.1f}MB**\nTelegram limit: 50MB"
+                )
             else:
-                await status_msg.edit_text("❌ **File too small or corrupted**")
+                await context.bot.edit_message_text(
+                    chat_id=update.effective_chat.id,
+                    message_id=status_msg.message_id,
+                    text="❌ **File too small or corrupted**"
+                )
         else:
-            await status_msg.edit_text(f"❌ **Download failed**\n\n{title}")
+            await context.bot.edit_message_text(
+                chat_id=update.effective_chat.id,
+                message_id=status_msg.message_id,
+                text=f"❌ **Download failed**\n\n{title}"
+            )
     
     except Exception as e:
         logger.error(f"Handler error: {e}")
-        await status_msg.edit_text("❌ **An error occurred**\nPlease try again")
+        await context.bot.edit_message_text(
+            chat_id=update.effective_chat.id,
+            message_id=status_msg.message_id,
+            text="❌ **An error occurred**\nPlease try again"
+        )
     
     finally:
         # Cleanup
@@ -300,7 +335,7 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.error(f"Cleanup error: {e}")
 
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+async def error_handler(update, context):
     """Global error handler"""
     logger.error("Update caused error", exc_info=context.error)
 
@@ -323,34 +358,31 @@ def main():
         else:
             logger.warning("yt-dlp not available!")
         
-        # Create application using the older API
-        from telegram.ext import Updater, CommandHandler as OldCommandHandler, MessageHandler as OldMessageHandler, Filters
+        # Create application using the v20.9 API
+        from telegram.ext import Application, CommandHandler, MessageHandler, filters
         
-        updater = Updater(token=BOT_TOKEN, use_context=True)
-        dispatcher = updater.dispatcher
+        app = Application.builder().token(BOT_TOKEN).build()
         
         # Add handlers
-        dispatcher.add_handler(OldCommandHandler("start", start_command))
-        dispatcher.add_handler(OldCommandHandler("help", help_command))
-        dispatcher.add_handler(OldCommandHandler("status", status_command))
-        dispatcher.add_handler(OldMessageHandler(Filters.text & ~Filters.command, handle_url))
+        app.add_handler(CommandHandler("start", start_command))
+        app.add_handler(CommandHandler("help", help_command))
+        app.add_handler(CommandHandler("status", status_command))
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_url))
         
         logger.info("Bot ready!")
         
         # Start bot
         if RENDER and WEBHOOK_URL:
             logger.info(f"Starting webhook mode on port {PORT}")
-            updater.start_webhook(
+            app.run_webhook(
                 listen="0.0.0.0",
                 port=PORT,
-                url_path=BOT_TOKEN,
-                webhook_url=WEBHOOK_URL
+                webhook_url=WEBHOOK_URL,
+                url_path=BOT_TOKEN
             )
         else:
             logger.info("Starting polling mode")
-            updater.start_polling()
-        
-        updater.idle()
+            app.run_polling()
     
     except Exception as e:
         logger.error(f"Startup error: {e}")
