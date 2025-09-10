@@ -67,9 +67,8 @@ class TikTokDownloader:
             return any(d in domain for d in tiktok_domains)
         except:
             return False
-    
+     """Download TikTok video using yt-dlp"""
     async def download_tiktok(self, url):
-    """Download TikTok video using yt-dlp"""
     try:
         timestamp = int(time.time())
         output_template = os.path.join(self.temp_dir, f"tiktok_{timestamp}.%(ext)s")
