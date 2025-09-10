@@ -74,42 +74,24 @@ class TikTokDownloader:
         timestamp = int(time.time())
         output_template = os.path.join(self.temp_dir, f"tiktok_{timestamp}.%(ext)s")
         
-        # Set SSL certificate path
-        cert_path = "/etc/ssl/certs/ca-certificates.crt"
-        if not os.path.exists(cert_path):
-            cert_path = "/etc/ssl/certs/ca-bundle.crt"
-        
         cmd = [
             'yt-dlp',
             '--format', 'best[filesize<50M]/worst',
             '--output', output_template,
             '--no-playlist',
             '--no-warnings',
+            '--no-check-certificates',  # Disable SSL verification
             '--force-ipv4',
             '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            '--compat-options', 'no-certifi',  # Disable certifi usage
             url
         ]
         
-        # Add certificate path if available
-        if os.path.exists(cert_path):
-            cmd.extend(['--client-certificate', cert_path])
-        else:
-            # Fallback to no certificate check
-            cmd.append('--no-check-certificates')
-        
         logger.info(f"Downloading: {url}")
-        
-        # Set environment to use system certificates
-        env = os.environ.copy()
-        env['SSL_CERT_FILE'] = cert_path if os.path.exists(cert_path) else ''
-        env['REQUESTS_CA_BUNDLE'] = cert_path if os.path.exists(cert_path) else ''
         
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=env
+            stderr=asyncio.subprocess.PIPE
         )
         
         try:
@@ -144,7 +126,7 @@ class TikTokDownloader:
                 return None, "Video not found", 0
             else:
                 return None, "Download failed", 0
-    
+        
     except Exception as e:
         logger.error(f"Download error: {e}")
         return None, f"Error: {str(e)[:50]}", 0
